@@ -42,6 +42,7 @@ Executable count-von-count
     bytestring               >= 0.10.2  && <= 0.10.4.0,
     conduit                  >= 1.0     && < 1.1,
     containers               >= 0.3     && < 0.6,
+    digest                   >= 0.0.0.1 && <= 0.0.1.2,
     digestive-functors       >= 0.4.1   && < 0.8,
     digestive-functors-blaze >= 0.4     && < 0.7,
     digestive-functors-snap  >= 0.4     && < 0.7,

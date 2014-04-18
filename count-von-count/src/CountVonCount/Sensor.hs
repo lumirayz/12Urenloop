@@ -18,9 +18,11 @@ import qualified Data.ByteString                  as B
 import           Data.ByteString.Char8            ()
 import qualified Data.ByteString.Char8            as BC
 import qualified Data.ByteString.Lazy             as BL
+import Data.Digest.CRC32 (crc32)
 import           Data.Foldable                    (forM_)
 import           Data.Time                        (UTCTime, getCurrentTime)
 import           Data.Typeable                    (Typeable)
+import Data.Word (Word32)
 import qualified Gyrid.Bluetooth_DataRaw          as BDR
 import qualified Gyrid.RequestStartdata           as RSD
 import qualified Gyrid.RequestCaching             as RC
@@ -66,10 +68,11 @@ listen logger eventBase port = do
     forever $ do
         (conn, _)           <- S.accept sock
         (inBytes, outBytes) <- socketToStreams conn
-        inPayload           <- int16Receiver inBytes
-        inMsgs              <- messageReceiver inPayload
         outPayload          <- int16Sender outBytes
         outMsgs             <- messageSender outPayload
+        inPayload           <- int16Receiver inBytes
+        inPayload'          <- Streams.mapM_ (sendAck outMsgs) inPayload
+        inMsgs              <- messageReceiver inPayload'
         _ <- forkIO $ isolate_ logger "Sensor send config" $ do
             string logger "CountVonCount.Sensor.listen" "Socket connected"
             (flip Streams.write) outMsgs dataMessage
@@ -126,6 +129,15 @@ listen logger eventBase port = do
             { RC.enableCaching = Just False
             , RC.clearCache = Just True
             , RC.pushCache = Nothing } }
+    toBytes :: Word32 -> BL.ByteString
+    toBytes w = BL.pack [ fromIntegral (w `shiftR` 24)
+                        , fromIntegral (w `shiftR` 16)
+                        , fromIntegral (w `shiftR` 8)
+                        , fromIntegral w
+                        ]
+    sendAck :: Streams.OutputStream Msg -> Payload -> IO ()
+    sendAck outMsgs bs = (flip Streams.write) outMsgs $ Just $ (mkMsg Type_ACK)
+        { Msg.ack = Just $ toBytes $ crc32 bs }
 
 
 --------------------------------------------------------------------------------
